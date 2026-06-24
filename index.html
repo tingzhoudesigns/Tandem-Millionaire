@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Who Wants to Be a Millionaire?</title>
+
+<!--
+  ============================================================================
+  WHO WANTS TO BE A MILLIONAIRE  (single-file build)
+  Created for Ting Zhou — tingzhoudesigns.com
+  ----------------------------------------------------------------------------
+  • Self-contained: HTML + CSS + JS in one file. No external fonts, images,
+    network/API calls, or localStorage. All state lives in memory.
+  • Safe to embed on Squarespace via a Code Block.
+  • TO SWAP QUESTIONS LATER: edit only the QUESTIONS array in the <script>
+    at the bottom. Each item = { q, options:[A,B,C,D], correct: 0..3 }.
+  • TO RETUNE THE MONEY LADDER / SAFE HAVENS: edit LADDER and SAFE_RUNGS.
+  ============================================================================
+-->
+
+<style>
+  /* ----------------------------------------------------------------------
+     PALETTE & TOKENS  (classic Millionaire mood: deep blue + gold)
+     ---------------------------------------------------------------------- */
+  :root {
+    --blue-900: #02061f;   /* darkest backdrop */
+    --blue-800: #050d33;
+    --blue-700: #0a1a4f;
+    --blue-600: #122a6b;   /* answer fill top */
+    --blue-500: #0a1a4a;   /* answer fill bottom */
+    --gold-200: #ffe9a8;
+    --gold-400: #f5c542;   /* primary gold */
+    --gold-500: #d4af37;
+    --gold-600: #caa63a;
+    --amber:    #f7941d;   /* selected state */
+    --amber-2:  #c96f00;
+    --green:    #2ecc52;   /* correct */
+    --green-2:  #178a32;
+    --red:      #e84545;   /* wrong */
+    --red-2:    #a31f1f;
+    --ink:      #ffffff;
+    --ink-soft: #c9d4f0;
+    --ink-mute: #8b97c2;
+
+    --shape: polygon(4% 0, 96% 0, 100% 50%, 96% 100%, 4% 100%, 0 50%);
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    font-family: var(--font);
+    color: var(--ink);
+  }
+
+  /* Deep-blue spotlight gradient — the signature backdrop */
+  body {
+    background:
+      radial-gradient(ellipse 120% 90% at 50% 8%, #1c357f 0%, #0a1a4f 38%, var(--blue-800) 68%, var(--blue-900) 100%);
+    background-attachment: fixed;
+    padding: clamp(12px, 3vw, 28px);
+  }
+
+  .stage {
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+
+  /* ----------------------------------------------------------------------
+     TITLE
+     ---------------------------------------------------------------------- */
+  .title {
+    text-align: center;
+    margin: 4px 0 18px;
+  }
+  .title h1 {
+    margin: 0;
+    font-size: clamp(1.4rem, 4.4vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, var(--gold-200), var(--gold-500));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.25);
+  }
+  .title p {
+    margin: 6px 0 0;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  /* ----------------------------------------------------------------------
+     LAYOUT: play area + money ladder
+     ---------------------------------------------------------------------- */
+  .game {
+    display: flex;
+    gap: clamp(14px, 2.5vw, 26px);
+    align-items: stretch;
+  }
+  .play {
+    flex: 1 1 auto;
+    min-width: 0;        /* allow flex child to shrink/wrap text */
+    display: flex;
+    flex-direction: column;
+  }
+  .ladder-panel {
+    flex: 0 0 220px;
+  }
+
+  /* ----------------------------------------------------------------------
+     TOP BAR: lifeline + current prize
+     ---------------------------------------------------------------------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: clamp(14px, 2.5vw, 22px);
+  }
+  .lifeline {
+    appearance: none;
+    border: 2px solid var(--gold-500);
+    background: linear-gradient(180deg, var(--blue-600), var(--blue-500));
+    color: var(--gold-200);
+    font: inherit;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    padding: 10px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+  }
+  .lifeline:hover:not(:disabled) {
+    box-shadow: 0 0 16px rgba(245,197,66,0.45);
+    transform: translateY(-1px);
+  }
+  .lifeline:disabled {
+    opacity: 0.32;
+    cursor: not-allowed;
+    text-decoration: line-through;
+  }
+  .prize-now {
+    text-align: right;
+    line-height: 1.15;
+  }
+  .prize-now .label {
+    display: block;
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .prize-now .value {
+    font-size: clamp(1rem, 2.6vw, 1.35rem);
+    font-weight: 800;
+    color: var(--gold-400);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ----------------------------------------------------------------------
+     QUESTION BAR (lozenge)
+     ---------------------------------------------------------------------- */
+  .qwrap { margin-bottom: clamp(16px, 3vw, 26px); }
+  .qbar {
+    clip-path: var(--shape);
+    background: linear-gradient(180deg, var(--gold-200), var(--gold-600));
+    padding: 2px;            /* this is the gold rim thickness */
+  }
+  .qbar-inner {
+    clip-path: var(--shape);
+    background: linear-gradient(180deg, #0e2152, #081640);
+    padding: clamp(18px, 4vw, 30px) clamp(40px, 7vw, 72px);
+    min-height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .qnum {
+    color: var(--gold-400);
+    font-weight: 800;
+    margin-right: 8px;
+  }
+  .qtext {
+    font-size: clamp(1rem, 2.6vw, 1.3rem);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--ink);
+  }
+
+  /* ----------------------------------------------------------------------
+     ANSWER GRID (2x2 desktop, 1 column mobile) — hexagon/lozenge buttons
+     ---------------------------------------------------------------------- */
+  .answers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(12px, 2.2vw, 18px);
+  }
+
+  .answer {
+    appearance: none;
+    border: 0;
+    background: transparent;   /* the visible shape is the inner spans */
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    border-radius: 6px;        /* keeps the focus-visible ring tidy */
+  }
+  .answer:disabled { cursor: default; }
+
+  /* gold rim layer */
+  .opt-shape {
+    display: block;            /* span defaults to inline; block makes it fill the button width */
+    clip-path: var(--shape);
+    background: linear-gradient(180deg, var(--gold-200), var(--gold-600));
+    padding: 2px;
+    transition: filter .2s ease;
+  }
+  /* dark fill layer */
+  .opt-fill {
+    clip-path: var(--shape);
+    background: linear-gradient(180deg, var(--blue-600), var(--blue-500));
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px clamp(20px, 4vw, 34px);
+    transition: background .25s ease;
+  }
+  .opt-letter {
+    color: var(--gold-400);
+    font-weight: 800;
+    flex: 0 0 auto;
+  }
+  .opt-text {
+    color: var(--ink);
+    font-weight: 600;
+    line-height: 1.25;
+    font-size: clamp(0.92rem, 2.2vw, 1.05rem);
+  }
+
+  /* Hover (only when the option is still interactive) */
+  .answer:not(:disabled):hover .opt-fill {
+    background: linear-gradient(180deg, #1b3c8f, #102a6b);
+  }
+
+  /* Keyboard focus — drop-shadow traces the clipped hexagon outline */
+  .answer:focus-visible { outline: none; }
+  .answer:focus-visible .opt-shape {
+    filter: drop-shadow(0 0 0 #fff) drop-shadow(0 0 9px var(--gold-200));
+  }
+
+  /* SELECTED (picked, not yet locked) -> amber */
+  .answer.selected .opt-fill {
+    background: linear-gradient(180deg, var(--amber), var(--amber-2));
+  }
+  .answer.selected .opt-shape {
+    filter: drop-shadow(0 0 12px rgba(247,148,29,0.75));
+  }
+  .answer.selected .opt-letter { color: #fff; }
+
+  /* LOCKED -> pulse while the reveal builds suspense */
+  .answer.locked .opt-shape {
+    animation: lockpulse 0.65s ease-in-out infinite alternate;
+  }
+  @keyframes lockpulse {
+    from { filter: drop-shadow(0 0 6px rgba(247,148,29,0.55)); }
+    to   { filter: drop-shadow(0 0 20px rgba(247,148,29,0.95)); }
+  }
+
+  /* CORRECT reveal -> green */
+  .answer.correct .opt-fill {
+    background: linear-gradient(180deg, var(--green), var(--green-2));
+  }
+  .answer.correct .opt-shape {
+    animation: none;
+    filter: drop-shadow(0 0 16px rgba(46,204,82,0.8));
+  }
+  .answer.correct .opt-letter { color: #eafff0; }
+
+  /* WRONG reveal -> red (only the player's wrong pick) */
+  .answer.wrong .opt-fill {
+    background: linear-gradient(180deg, var(--red), var(--red-2));
+  }
+  .answer.wrong .opt-shape {
+    animation: none;
+    filter: drop-shadow(0 0 16px rgba(232,69,69,0.8));
+  }
+  .answer.wrong .opt-letter { color: #ffeaea; }
+
+  /* REMOVED by 50:50 */
+  .answer.removed { pointer-events: none; }
+  .answer.removed .opt-shape { opacity: 0.16; filter: none; }
+  .answer.removed .opt-text,
+  .answer.removed .opt-letter { visibility: hidden; }
+
+  /* ----------------------------------------------------------------------
+     FINAL ANSWER button
+     ---------------------------------------------------------------------- */
+  .final-row {
+    margin-top: clamp(16px, 3vw, 24px);
+    display: flex;
+    justify-content: center;
+  }
+  .final-btn {
+    appearance: none;
+    border: 2px solid var(--gold-400);
+    background: linear-gradient(180deg, var(--gold-200), var(--gold-500));
+    color: #2a1c00;
+    font: inherit;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 13px 34px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+  }
+  .final-btn:hover:not(:disabled) {
+    box-shadow: 0 0 22px rgba(245,197,66,0.6);
+    transform: translateY(-1px);
+  }
+  .final-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: linear-gradient(180deg, #6b6650, #4a4636);
+    border-color: #6b6650;
+    color: #d8d2bf;
+  }
+  .final-btn:focus-visible {
+    outline: 3px solid var(--gold-200);
+    outline-offset: 3px;
+  }
+
+  /* ----------------------------------------------------------------------
+     MONEY LADDER
+     ---------------------------------------------------------------------- */
+  .ladder {
+    list-style: none;
+    margin: 0;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;   /* rung 12 at top -> rung 1 at bottom */
+    gap: 6px;
+    border: 2px solid rgba(245,197,66,0.35);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(8,18,55,0.7), rgba(3,8,28,0.7));
+  }
+  .rung {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    transition: background .2s ease, color .2s ease, box-shadow .2s ease;
+  }
+  .rung .rung-num {
+    flex: 0 0 22px;
+    text-align: right;
+    font-size: 0.78rem;
+    color: var(--ink-mute);
+    font-weight: 700;
+  }
+  .rung .rung-val {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .rung.safe .rung-val { color: var(--gold-400); }      /* safe havens stand out */
+  .rung.safe { border-left: 3px solid var(--gold-500); padding-left: 9px; }
+  .rung.passed { color: var(--ink-mute); opacity: 0.6; }
+  .rung.active {
+    background: linear-gradient(180deg, var(--amber), var(--amber-2));
+    color: #fff;
+    box-shadow: 0 0 16px rgba(247,148,29,0.6);
+    animation: rungpulse 1.1s ease-in-out infinite alternate;
+  }
+  .rung.active .rung-num { color: rgba(255,255,255,0.85); }
+  .rung.active .rung-val { color: #fff; }
+  @keyframes rungpulse {
+    from { box-shadow: 0 0 10px rgba(247,148,29,0.45); }
+    to   { box-shadow: 0 0 22px rgba(247,148,29,0.85); }
+  }
+
+  /* ----------------------------------------------------------------------
+     END / START OVERLAY SCREENS
+     ---------------------------------------------------------------------- */
+  .screen {
+    text-align: center;
+    padding: clamp(28px, 6vw, 56px) clamp(18px, 4vw, 40px);
+    border: 2px solid rgba(245,197,66,0.4);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(10,22,60,0.85), rgba(3,8,28,0.9));
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .screen h2 {
+    margin: 0 0 10px;
+    font-size: clamp(1.4rem, 4.5vw, 2.2rem);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, var(--gold-200), var(--gold-500));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .screen .big-prize {
+    font-size: clamp(2rem, 8vw, 3.4rem);
+    font-weight: 900;
+    color: var(--gold-400);
+    margin: 10px 0 6px;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 24px rgba(245,197,66,0.5);
+  }
+  .screen.win .big-prize { animation: shimmer 1.6s ease-in-out infinite alternate; }
+  @keyframes shimmer {
+    from { text-shadow: 0 0 14px rgba(245,197,66,0.4); }
+    to   { text-shadow: 0 0 40px rgba(245,197,66,0.95); }
+  }
+  .screen p { color: var(--ink-soft); line-height: 1.5; margin: 6px 0 0; }
+  .screen .rules {
+    text-align: left;
+    display: inline-block;
+    margin: 16px auto 0;
+    color: var(--ink-soft);
+    font-size: 0.92rem;
+    line-height: 1.7;
+  }
+  .play-again, .start-btn {
+    appearance: none;
+    border: 2px solid var(--gold-400);
+    background: linear-gradient(180deg, var(--gold-200), var(--gold-500));
+    color: #2a1c00;
+    font: inherit; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 14px 38px;
+    border-radius: 999px;
+    cursor: pointer;
+    margin-top: 22px;
+    transition: transform .12s ease, box-shadow .2s ease;
+  }
+  .play-again:hover, .start-btn:hover {
+    box-shadow: 0 0 22px rgba(245,197,66,0.6);
+    transform: translateY(-1px);
+  }
+  .play-again:focus-visible, .start-btn:focus-visible {
+    outline: 3px solid var(--gold-200); outline-offset: 3px;
+  }
+
+  /* ----------------------------------------------------------------------
+     FOOTER
+     ---------------------------------------------------------------------- */
+  footer {
+    text-align: center;
+    margin-top: clamp(22px, 4vw, 36px);
+    color: var(--ink-mute);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+  }
+  footer a { color: var(--gold-400); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* visually-hidden live region for screen readers */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ----------------------------------------------------------------------
+     RESPONSIVE: ladder collapses to a horizontal strip on top (mobile)
+     ---------------------------------------------------------------------- */
+  @media (max-width: 760px) {
+    .game { flex-direction: column; }
+    .ladder-panel { order: -1; flex: 1 1 auto; }   /* ladder moves to top */
+    .ladder {
+      flex-direction: row-reverse;   /* rung 1 at left -> rung 12 at right */
+      overflow-x: auto;
+      padding: 10px;
+      gap: 6px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .rung {
+      flex: 0 0 auto;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 7px 10px;
+      min-width: 64px;
+    }
+    .rung .rung-num { text-align: center; }
+    .rung .rung-val { font-size: 0.82rem; }
+    .rung.safe { border-left: 0; border-top: 3px solid var(--gold-500); padding-top: 5px; }
+    .answers { grid-template-columns: 1fr; }   /* stack answers for tappability */
+    .qbar-inner { padding: 18px 30px; }
+  }
+
+  /* Respect reduced-motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    .answer.locked .opt-shape,
+    .rung.active,
+    .screen.win .big-prize { animation: none; }
+    * { transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+
+<body>
+<div class="stage">
+
+  <div class="title">
+    <!-- Rename this freely; it's just text. -->
+    <h1>Who Wants to Be a Millionaire?</h1>
+  </div>
+
+  <!-- ===================== START SCREEN ===================== -->
+  <section id="start-screen" class="screen" aria-label="Start screen">
+    <h2>Ready to play?</h2>
+    <p>Answer 12 questions in a row to climb the ladder to <strong style="color:var(--gold-400)">$1,000,000</strong>.</p>
+    <div class="rules">
+      • One question at a time — pick A, B, C, or D, then hit <strong>Final Answer</strong> to lock it in.<br>
+      • A correct answer climbs one rung. A wrong answer ends the game.<br>
+      • <strong>Safe havens</strong> at rung 4 ($500) and rung 8 ($8,000) — once passed, that money is guaranteed.<br>
+      • One <strong>50:50</strong> lifeline removes two wrong options. Use it wisely.
+    </div>
+    <br>
+    <button id="start-btn" class="start-btn" type="button">Start Game</button>
+  </section>
+
+  <!-- ===================== GAME ===================== -->
+  <main id="game" class="game hidden" aria-label="Quiz game">
+    <div class="play">
+
+      <div class="topbar">
+        <button id="lifeline-5050" class="lifeline" type="button" aria-label="Use fifty-fifty lifeline: removes two wrong options">50:50</button>
+        <div class="prize-now">
+          <span class="label">Playing for</span>
+          <span class="value" id="prize-now-value">$100</span>
+        </div>
+      </div>
+
+      <div class="qwrap">
+        <div class="qbar">
+          <div class="qbar-inner">
+            <h2 id="question" tabindex="-1" style="margin:0;font-weight:600;">
+              <span class="qnum" id="qnum">1.</span>
+              <span class="qtext" id="qtext">Question text</span>
+            </h2>
+          </div>
+        </div>
+      </div>
+
+      <div class="answers" id="answers" role="group" aria-label="Answer options">
+        <!-- 4 answer buttons injected by JS -->
+      </div>
+
+      <div class="final-row">
+        <button id="final-btn" class="final-btn" type="button" disabled>Final Answer</button>
+      </div>
+    </div>
+
+    <!-- Money ladder -->
+    <aside class="ladder-panel" aria-label="Prize ladder">
+      <ol class="ladder" id="ladder"><!-- rungs injected by JS --></ol>
+    </aside>
+  </main>
+
+  <!-- ===================== END SCREEN ===================== -->
+  <section id="end-screen" class="screen hidden" aria-label="Results">
+    <h2 id="end-title">Game Over</h2>
+    <div class="big-prize" id="end-prize">$0</div>
+    <p id="end-message"></p>
+    <button id="play-again" class="play-again" type="button">Play Again</button>
+  </section>
+
+  <!-- Live region: announces correctness + prize changes to screen readers -->
+  <div class="sr-only" aria-live="assertive" id="announcer"></div>
+
+  <footer>
+    Created by Ting Zhou — <a href="https://tingzhoudesigns.com" target="_blank" rel="noopener">tingzhoudesigns.com</a>
+  </footer>
+</div>
+
+<script>
+/* ==========================================================================
+   1) CONTENT — edit here to swap questions or retune the ladder
+   ========================================================================== */
+
+// Each question has exactly 4 options [A, B, C, D]; `correct` is the index 0..3.
+const QUESTIONS = [
+  { q: "Where is Tandem HQ located?",
+    options: ["Irvine, CA", "San Diego, CA", "St-Sulpice, Switzerland", "Los Angeles, CA"],
+    correct: 1 },
+
+  { q: "Which of the following is Tandem's main manufacturing site?",
+    options: ["High Bluff", "Bernes Canyon", "Irvine", "Marindustry"],
+    correct: 1 },
+
+  { q: "When did Tandem go IPO?",
+    options: ["2005", "2013", "2018", "2020"],   // (3rd option relabeled C per your confirmation)
+    correct: 1 },
+
+  { q: "When did Tandem announce the United States commercial launch of its new Tandem Mobi?",
+    options: ["2012", "2016", "2020", "2024"],
+    correct: 3 },
+
+  { q: "What's the original name of Tandem?",
+    options: ["Phluid", "Tandem", "T1D Care", "T1D Breakthrough"],
+    correct: 0 },
+
+  { q: "Which of the following Tandem products has a touch screen?",
+    options: ["Mobi", "T:slim X2", "Sigi", "Tandem CGM"],
+    correct: 1 },
+
+  { q: "Who is Tandem's CEO?",
+    options: ["John Sheridan", "John Williams", "John Legend", "John Travolta"],  // Sharidan -> Sheridan
+    correct: 0 },
+
+  { q: "Where can you access the Tandem Organization Chart to know more about other departments and employees?",
+    options: ["On Tandem's official website", "In the Workday System", "Google search", "The only way is to contact HR department"],
+    correct: 1 },
+
+  { q: "As of today, Tandem does NOT have employees working in this location",
+    options: ["Canada", "Switzerland", "United Kingdom", "Japan"],   // Swetland -> Switzerland
+    correct: 3 },
+
+  { q: "What many Words We Live By do we have?",
+    options: ["4", "5", "6", "8"],
+    correct: 1 },
+
+  { q: "In 2026, Tandem's Mobi is powered by what technology?",
+    options: ["Control \u2013 AI", "Control \u2013 IQ", "t:slim \u2013 AI", "Mobi \u2013 AI"],
+    correct: 1 },
+
+  { q: "In 2026, Control-IQ+ is available for ages __ (type 1) and above?",
+    options: ["2", "4", "6", "8"],
+    correct: 0 },
+];
+
+// 12-rung money ladder (index 0 = rung 1 ... index 11 = rung 12).
+const LADDER = [100, 200, 300, 500, 1000, 2000, 4000, 8000, 16000, 64000, 250000, 1000000];
+
+// Safe-haven rung NUMBERS (1-indexed). Once a player correctly answers one of
+// these rungs, its value is guaranteed even if they later miss a question.
+const SAFE_RUNGS = [4, 8];
+
+// Reveal pacing (ms) — tweak for more/less suspense.
+const PULSE_MS         = 1300;  // lock-in pulse before the answer is revealed
+const CORRECT_HOLD_MS  = 1600;  // show green, then advance
+const WRONG_HOLD_MS     = 2300; // show red + green, then game over
+
+/* ==========================================================================
+   2) STATE
+   ========================================================================== */
+const LETTERS = ["A", "B", "C", "D"];
+let currentRung;        // 1..12 (rung being attempted)
+let securedWinnings;    // guaranteed $ locked via safe havens
+let selectedIndex;      // 0..3 or null
+let phase;              // 'start' | 'question' | 'reveal' | 'end'
+let fiftyUsed;          // 50:50 lifeline consumed?
+let removed;            // Set of option indices removed by 50:50
+
+/* ==========================================================================
+   3) DOM REFERENCES
+   ========================================================================== */
+const el = {
+  start:      document.getElementById("start-screen"),
+  game:       document.getElementById("game"),
+  end:        document.getElementById("end-screen"),
+  startBtn:   document.getElementById("start-btn"),
+  qnum:       document.getElementById("qnum"),
+  qtext:      document.getElementById("qtext"),
+  question:   document.getElementById("question"),
+  answers:    document.getElementById("answers"),
+  finalBtn:   document.getElementById("final-btn"),
+  lifeline:   document.getElementById("lifeline-5050"),
+  prizeNow:   document.getElementById("prize-now-value"),
+  ladder:     document.getElementById("ladder"),
+  endTitle:   document.getElementById("end-title"),
+  endPrize:   document.getElementById("end-prize"),
+  endMessage: document.getElementById("end-message"),
+  playAgain:  document.getElementById("play-again"),
+  announcer:  document.getElementById("announcer"),
+};
+
+/* ==========================================================================
+   4) HELPERS
+   ========================================================================== */
+function money(n) { return "$" + n.toLocaleString("en-US"); }
+
+function announce(msg) {
+  // Clear then set so repeated identical messages are still read aloud.
+  el.announcer.textContent = "";
+  window.setTimeout(() => { el.announcer.textContent = msg; }, 60);
+}
+
+/* ==========================================================================
+   5) RENDERING
+   ========================================================================== */
+
+// Build the money ladder once; rung 12 at top down to rung 1 at bottom.
+function renderLadder() {
+  el.ladder.innerHTML = "";
+  for (let rung = LADDER.length; rung >= 1; rung--) {
+    const value = LADDER[rung - 1];
+    const li = document.createElement("li");
+    li.className = "rung";
+    if (SAFE_RUNGS.includes(rung)) li.classList.add("safe");
+    if (rung === currentRung) li.classList.add("active");
+    if (rung < currentRung)     li.classList.add("passed");
+    li.innerHTML =
+      '<span class="rung-num">' + rung + '</span>' +
+      '<span class="rung-val">' + money(value) + '</span>';
+    el.ladder.appendChild(li);
+  }
+  // On mobile (horizontal strip) keep the active rung in view.
+  const active = el.ladder.querySelector(".rung.active");
+  if (active && window.matchMedia("(max-width: 760px)").matches) {
+    active.scrollIntoView({ block: "nearest", inline: "center" });
+  }
+}
+
+// Render the current question + its four answer buttons.
+function renderQuestion() {
+  const item = QUESTIONS[currentRung - 1];
+
+  el.qnum.textContent = currentRung + ".";
+  el.qtext.textContent = item.q;
+  el.prizeNow.textContent = money(LADDER[currentRung - 1]);
+
+  // Reset per-question state
+  selectedIndex = null;
+  removed = new Set();
+  el.finalBtn.disabled = true;
+  el.lifeline.disabled = fiftyUsed;
+
+  // Build answer buttons
+  el.answers.innerHTML = "";
+  item.options.forEach((text, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "answer";
+    btn.dataset.index = i;
+    btn.setAttribute("aria-label", LETTERS[i] + ": " + text);
+    btn.innerHTML =
+      '<span class="opt-shape"><span class="opt-fill">' +
+        '<span class="opt-letter">' + LETTERS[i] + '</span>' +
+        '<span class="opt-text">' + escapeHtml(text) + '</span>' +
+      '</span></span>';
+    btn.addEventListener("click", () => selectOption(i));
+    el.answers.appendChild(btn);
+  });
+
+  renderLadder();
+
+  // Move focus to the question so screen readers announce it; Tab reaches options.
+  el.question.focus();
+}
+
+// Minimal HTML escaping for option text (defensive; content is trusted).
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* ==========================================================================
+   6) GAME FLOW
+   ========================================================================== */
+function startGame() {
+  currentRung = 1;
+  securedWinnings = 0;
+  fiftyUsed = false;
+  phase = "question";
+
+  el.start.classList.add("hidden");
+  el.end.classList.add("hidden");
+  el.game.classList.remove("hidden");
+
+  renderQuestion();
+}
+
+function selectOption(i) {
+  if (phase !== "question") return;
+  if (removed.has(i)) return;
+
+  selectedIndex = i;
+
+  // Update highlight on all option buttons.
+  [...el.answers.children].forEach((btn) => {
+    btn.classList.toggle("selected", Number(btn.dataset.index) === i);
+  });
+
+  el.finalBtn.disabled = false;
+  // Streamline keyboard flow: after picking, focus the lock-in button.
+  el.finalBtn.focus();
+}
+
+function lockIn() {
+  if (phase !== "question" || selectedIndex === null) return;
+  phase = "reveal";
+
+  const chosen = el.answers.children[selectedIndex];
+  chosen.classList.remove("selected");
+  chosen.classList.add("locked");
+
+  // Freeze all interaction during the suspense + reveal.
+  setAnswersDisabled(true);
+  el.finalBtn.disabled = true;
+  el.lifeline.disabled = true;
+
+  announce("Locking in " + LETTERS[selectedIndex] + ".");
+
+  // Suspense pulse, then reveal the verdict.
+  window.setTimeout(reveal, PULSE_MS);
+}
+
+function reveal() {
+  const item = QUESTIONS[currentRung - 1];
+  const correctIndex = item.correct;
+  const chosen = el.answers.children[selectedIndex];
+  const correctBtn = el.answers.children[correctIndex];
+
+  chosen.classList.remove("locked");
+
+  if (selectedIndex === correctIndex) {
+    // Right answer
+    chosen.classList.add("correct");
+
+    // Lock safe-haven money if this rung is a safe haven.
+    if (SAFE_RUNGS.includes(currentRung)) {
+      securedWinnings = LADDER[currentRung - 1];
+    }
+
+    announce("Correct. " + LETTERS[correctIndex] + " is right.");
+
+    window.setTimeout(() => {
+      if (currentRung === LADDER.length) {
+        endGame(true);              // answered the final rung -> WIN
+      } else {
+        currentRung += 1;           // climb one rung
+        phase = "question";
+        renderQuestion();
+      }
+    }, CORRECT_HOLD_MS);
+
+  } else {
+    // Wrong answer: light the pick red and the right answer green.
+    chosen.classList.add("wrong");
+    correctBtn.classList.add("correct");
+
+    announce("Incorrect. The correct answer was " + LETTERS[correctIndex] + ".");
+
+    window.setTimeout(() => endGame(false), WRONG_HOLD_MS);
+  }
+}
+
+function useFiftyFifty() {
+  if (phase !== "question" || fiftyUsed) return;
+  fiftyUsed = true;
+  el.lifeline.disabled = true;
+
+  const correctIndex = QUESTIONS[currentRung - 1].correct;
+
+  // Collect the wrong options, shuffle, and drop two of them.
+  const wrongs = [0, 1, 2, 3].filter((i) => i !== correctIndex);
+  for (let i = wrongs.length - 1; i > 0; i--) {       // Fisher-Yates shuffle
+    const j = Math.floor(Math.random() * (i + 1));
+    [wrongs[i], wrongs[j]] = [wrongs[j], wrongs[i]];
+  }
+  const toRemove = wrongs.slice(0, 2);
+  toRemove.forEach((i) => {
+    removed.add(i);
+    el.answers.children[i].classList.add("removed");
+    el.answers.children[i].disabled = true;
+  });
+
+  // If the current pick was just removed, clear the selection.
+  if (selectedIndex !== null && removed.has(selectedIndex)) {
+    el.answers.children[selectedIndex].classList.remove("selected");
+    selectedIndex = null;
+    el.finalBtn.disabled = true;
+  }
+
+  announce("Fifty-fifty used. Two wrong options removed.");
+}
+
+function endGame(won) {
+  phase = "end";
+  el.game.classList.add("hidden");
+  el.end.classList.remove("hidden");
+  el.end.classList.toggle("win", won);
+
+  if (won) {
+    el.endTitle.textContent = "You did it!";
+    el.endPrize.textContent = money(LADDER[LADDER.length - 1]);
+    el.endMessage.textContent = "Perfect run — all 12 rungs. You're a Tandem millionaire.";
+    announce("You won " + money(LADDER[LADDER.length - 1]) + ".");
+  } else {
+    el.endTitle.textContent = "Game Over";
+    el.endPrize.textContent = money(securedWinnings);
+    el.endMessage.textContent = securedWinnings > 0
+      ? "You pass a safe haven, so this much is guaranteed. Play again to go further."
+      : "No safe haven reached this time. Clear rung 4 to lock in your first guaranteed prize.";
+    announce("Game over. You leave with " + money(securedWinnings) + ".");
+  }
+
+  el.playAgain.focus();
+}
+
+function setAnswersDisabled(disabled) {
+  [...el.answers.children].forEach((btn) => {
+    // Never re-enable options the 50:50 removed.
+    if (disabled) btn.disabled = true;
+    else btn.disabled = btn.classList.contains("removed");
+  });
+}
+
+/* ==========================================================================
+   7) EVENTS
+   ========================================================================== */
+el.startBtn.addEventListener("click", startGame);
+el.finalBtn.addEventListener("click", lockIn);
+el.lifeline.addEventListener("click", useFiftyFifty);
+el.playAgain.addEventListener("click", startGame);
+
+// Keyboard: A/B/C/D or 1-4 select an option during the question phase.
+document.addEventListener("keydown", (e) => {
+  if (phase !== "question") return;
+
+  const key = e.key.toLowerCase();
+  const letterMap = { a: 0, b: 1, c: 2, d: 3 };
+  const numberMap = { "1": 0, "2": 1, "3": 2, "4": 3 };
+
+  let idx = null;
+  if (key in letterMap) idx = letterMap[key];
+  else if (e.key in numberMap) idx = numberMap[e.key];
+
+  if (idx !== null && !removed.has(idx)) {
+    e.preventDefault();
+    selectOption(idx);
+  }
+});
+
+/* ==========================================================================
+   8) INIT
+   ========================================================================== */
+phase = "start";
+renderLadder();   // show the full ladder behind the start screen state model
+</script>
+</body>
+</html>
