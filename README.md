@@ -2,17 +2,19 @@
 
 > Is that your final answer? A single-file, dependency-free trivia game in the style of the classic quiz show. Lock-in drama, a 50:50 lifeline, and a gold-and-blue climb to $1,000,000.
 
+**Play it live:** [tingzhoudesigns.github.io/Tandem-Millionaire](https://tingzhoudesigns.github.io/Tandem-Millionaire/)
+
 No build step. No npm. No CDN. No fonts or images to load. Just one HTML file you can open, host, or paste into almost any website. The whole game (markup, styling, and logic) lives in a single file and runs entirely in memory, so it drops into restrictive embed contexts without complaining.
 
 It ships with a 12-question sample quiz, but the questions are the easiest thing to swap. Bring your own and the game is yours.
 
 ## Live demo
 
-Host it on GitHub Pages (Settings → Pages → deploy from your default branch) and your demo lands at:
+Play it here:
 
-```
-https://<your-username>.github.io/<repo-name>/
-```
+**[https://tingzhoudesigns.github.io/Tandem-Millionaire/](https://tingzhoudesigns.github.io/Tandem-Millionaire/)**
+
+Forking it for your own quiz? Enable GitHub Pages under **Settings → Pages → Deploy from a branch** (`main`, `/root`), and add an empty file named **`.nojekyll`** to the repo root so Pages serves the HTML as-is instead of trying to build it with Jekyll. Your copy will land at `https://<your-username>.github.io/<repo-name>/`.
 
 ## Features
 
